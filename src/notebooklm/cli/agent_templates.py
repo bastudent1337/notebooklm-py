@@ -10,7 +10,7 @@ AGENT_TEMPLATE_FILES = {
 }
 
 REPO_ROOT_AGENTS = Path(__file__).resolve().parents[3] / "AGENTS.md"
-REPO_ROOT_SKILL_DIR = Path(__file__).resolve().parents[3] / "skills" / "notebooklm"
+REPO_ROOT_SKILL_DIR = Path(__file__).resolve().parents[3] / "plugin" / "skills" / "notebooklm"
 REPO_ROOT_CLAUDE_SKILL = REPO_ROOT_SKILL_DIR / "SKILL.md"
 
 
@@ -67,9 +67,10 @@ def get_skill_source_files() -> dict[str, str] | None:
     """Return the full packaged skill directory as ``{relative_posix_path: text}``.
 
     Mirrors :func:`get_agent_source_content`'s checkout-first, package-data-
-    fallback preference: prefers the repo-root ``skills/notebooklm/`` checkout
-    (keeps local CLI installs and GitHub in sync with the same source of
-    truth), falling back to the wheel-packaged ``notebooklm/data/skill/`` tree.
+    fallback preference: prefers the repo-root ``plugin/skills/notebooklm/``
+    checkout (keeps local CLI installs and GitHub in sync with the same
+    source of truth), falling back to the wheel-packaged
+    ``notebooklm/data/skill/`` tree.
     Returns ``None`` if neither is available (same exceptions swallowed as
     :func:`_read_package_data`).
     """

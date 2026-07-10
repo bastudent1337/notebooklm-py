@@ -1,12 +1,14 @@
-"""Static lint tests for the ``skills/notebooklm/`` Agent Skill directory.
+"""Static lint tests for the ``plugin/skills/notebooklm/`` Agent Skill directory.
 
 Companion to ``tests/unit/test_claude_code_plugin.py`` (which pins the
 plugin-manifest side: the ``skills`` field, the anti-shadowing invariant, and
-the launcher's executable bit). This file pins the skill *content*
-invariants introduced by the directory refactor: frontmatter shape, the
-``SKILL.md`` line budget, progressive-disclosure link integrity between
-``SKILL.md`` and ``references/``, and the PEP 723 / POSIX-bootstrap
-contracts the workflow scripts and launcher must honor.
+the launcher's executable bit). This file solely owns the skill *content*
+invariants: frontmatter shape, the ``SKILL.md`` line budget,
+progressive-disclosure link integrity between ``SKILL.md`` and
+``references/``, and the PEP 723 / POSIX-bootstrap contracts the workflow
+scripts and launcher must honor. (Not duplicated in
+``test_claude_code_plugin.py`` -- test modules must not cross-import each
+other, so each content invariant lives in exactly one file.)
 
 Static only — no network, no subprocess, no ``notebooklm`` import — so it
 runs in every environment, including ones without the ``browser``/``dev``
@@ -25,7 +27,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL_DIR = REPO_ROOT / "skills" / "notebooklm"
+SKILL_DIR = REPO_ROOT / "plugin" / "skills" / "notebooklm"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 REFERENCES_DIR = SKILL_DIR / "references"
 SCRIPTS_DIR = SKILL_DIR / "scripts"
@@ -41,12 +43,12 @@ _PEP723_BLOCK_RE = re.compile(r"^# /// script\s*$\n(.*?)^# ///\s*$", re.MULTILIN
 def _parse_frontmatter(text: str) -> dict[str, str]:
     """Minimal flat ``key: value`` frontmatter parser (no YAML dependency).
 
-    Mirrors the convention ``_app/skill.py``'s ``add_version_comment`` and
-    ``tests/unit/test_claude_code_plugin.py``'s ``_parse_frontmatter`` assume:
-    single-line ``name:`` / ``description:`` pairs between a leading ``---``
-    delimiter pair. Kept as a local, self-contained copy rather than an
-    import — ``test_*`` modules must not import from other ``test_*``
-    modules (``tests/_guardrails/test_no_cross_test_imports.py``).
+    Mirrors the convention ``_app/skill.py``'s ``add_version_comment``
+    assumes: single-line ``name:`` / ``description:`` pairs between a
+    leading ``---`` delimiter pair. This is the sole owner of frontmatter
+    *content* checks (see module docstring) -- kept local rather than
+    imported elsewhere, since ``test_*`` modules must not import from other
+    ``test_*`` modules (``tests/_guardrails/test_no_cross_test_imports.py``).
     """
     if not text.startswith("---"):
         return {}

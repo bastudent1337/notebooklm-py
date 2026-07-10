@@ -72,9 +72,9 @@ download `notebooklm-mcp.mcpb` from the
 [`desktop-extension/README.md`](../desktop-extension/README.md) for details.
 
 **Claude Code users** can instead add this repo as a plugin marketplace, which
-registers the same `uvx`-launched server via `.claude-plugin/plugin.json`
-(source of truth: [`../.claude-plugin/`](../.claude-plugin/)) **and** bundles
-the `notebooklm` Agent Skill (source: [`../skills/notebooklm/`](../skills/notebooklm/)),
+registers the same `uvx`-launched server via `plugin/.claude-plugin/plugin.json`
+(source of truth: [`../plugin/.claude-plugin/`](../plugin/.claude-plugin/)) **and** bundles
+the `notebooklm` Agent Skill (source: [`../plugin/skills/notebooklm/`](../plugin/skills/notebooklm/)),
 surfaced in Claude Code as `/notebooklm-mcp:notebooklm`:
 
 ```text
@@ -85,7 +85,9 @@ surfaced in Claude Code as `/notebooklm-mcp:notebooklm`:
 This is equivalent to `notebooklm mcp install claude-code` plus
 `notebooklm skill install --target claude`, but managed through Claude Code's
 plugin UI (enable/disable, updates) instead of direct `~/.claude.json` edits
-and a manual skill install.
+and a manual skill install. Install one or the other, not both — the plugin
+already bundles the skill, so running `notebooklm skill install` afterward
+would just duplicate it.
 
 ## Run it directly
 

@@ -346,7 +346,7 @@ Defaults:
 - `show --target source` prints only the canonical packaged `SKILL.md` (not `references/`/`scripts/`)
 - Project-scope installs support `--dry-run`, `--no-clobber`, and `--force`; these flags are rejected for user-scope installs.
 
-The packaged wheel includes the whole `skills/notebooklm/` directory (as `notebooklm/data/skill/`), so the same skill content powers `notebooklm skill install`, GitHub discovery, and `npx skills add teng-lin/notebooklm-py`.
+The packaged wheel includes the whole `plugin/skills/notebooklm/` directory (as `notebooklm/data/skill/`), so the same skill content powers `notebooklm skill install`, GitHub discovery, and `npx skills add teng-lin/notebooklm-py`.
 
 Codex does not use the `skill` subcommand. In this repository it reads the root [`AGENTS.md`](../AGENTS.md) file and invokes the `notebooklm` CLI or Python API directly.
 
@@ -1477,7 +1477,7 @@ notebooklm profile delete old-account --yes
 
 ### Skill: `install`, `status`, `uninstall`, `show`
 
-Manage the bundled NotebookLM agent-skill directory (`SKILL.md` + `references/*.md` + `scripts/*`; source at [`skills/notebooklm/`](../skills/notebooklm/)). `install`/`uninstall`/`status` operate on the whole tree; installing materializes a copy under one of:
+Manage the bundled NotebookLM agent-skill directory (`SKILL.md` + `references/*.md` + `scripts/*`; source at [`plugin/skills/notebooklm/`](../plugin/skills/notebooklm/)). `install`/`uninstall`/`status` operate on the whole tree; installing materializes a copy under one of:
 - `.claude/skills/notebooklm/` (Claude Code, `--target claude`)
 - `.agents/skills/notebooklm/` (universal agent skill directory, `--target agents`)
 

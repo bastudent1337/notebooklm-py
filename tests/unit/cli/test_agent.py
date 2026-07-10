@@ -124,7 +124,7 @@ class TestSkillSourceFiles:
     """Tests for ``get_skill_source_files`` (the whole-tree install seam)."""
 
     def test_reads_checkout_tree(self):
-        """The full skills/notebooklm/ checkout is read into a flat rel-path dict."""
+        """The full plugin/skills/notebooklm/ checkout is read into a flat rel-path dict."""
         files = agent_templates_module.get_skill_source_files()
 
         assert files is not None
