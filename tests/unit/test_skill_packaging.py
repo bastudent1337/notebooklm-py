@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SKILL_DIR = _REPO_ROOT / "skills" / "notebooklm"
+_SKILL_DIR = _REPO_ROOT / "plugin" / "skills" / "notebooklm"
 
 
 def _build_wheel(tmp_path: Path) -> Path:
@@ -30,8 +30,9 @@ def _normalize(text: str) -> str:
 
 
 def test_wheel_includes_root_skill_content(tmp_path):
-    """The built wheel should carry the whole skills/notebooklm/ tree + AGENTS.md
-    into package data (notebooklm/data/skill/** and notebooklm/data/CODEX.md)."""
+    """The built wheel should carry the whole plugin/skills/notebooklm/ tree
+    + AGENTS.md into package data (notebooklm/data/skill/** and
+    notebooklm/data/CODEX.md)."""
     if shutil.which("uv") is None:
         pytest.skip("uv is required for build smoke tests")
 
@@ -66,8 +67,8 @@ def test_wheel_includes_root_skill_content(tmp_path):
 
 def test_wheel_skill_tree_is_byte_equal_to_source(tmp_path):
     """Every file under the packaged ``notebooklm/data/skill/`` tree is
-    byte-equal to its ``skills/notebooklm/`` source counterpart, and no source
-    file is missing from the wheel."""
+    byte-equal to its ``plugin/skills/notebooklm/`` source counterpart, and
+    no source file is missing from the wheel."""
     if shutil.which("uv") is None:
         pytest.skip("uv is required for build smoke tests")
 
@@ -77,7 +78,7 @@ def test_wheel_skill_tree_is_byte_equal_to_source(tmp_path):
         for path in _SKILL_DIR.rglob("*")
         if path.is_file()
     }
-    assert source_files, "skills/notebooklm/ source tree is unexpectedly empty"
+    assert source_files, "plugin/skills/notebooklm/ source tree is unexpectedly empty"
 
     with zipfile.ZipFile(wheel_path) as wheel:
         for rel_path, source_path in source_files.items():

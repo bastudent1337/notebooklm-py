@@ -49,6 +49,9 @@ pip install "notebooklm-py[browser] @ git+https://github.com/teng-lin/notebooklm
 - If you are already reading this file inside an installed agent skill
   directory, the skill is already installed. You only need the Python package
   and authentication below.
+- If you are reading this file as part of the Claude Code plugin
+  (`/plugin install notebooklm-mcp`), the skill is already bundled — don't
+  also run `notebooklm skill install` for Claude Code.
 
 **CLI-managed install:**
 ```bash

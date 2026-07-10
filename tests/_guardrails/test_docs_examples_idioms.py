@@ -23,7 +23,7 @@ pytestmark = pytest.mark.repo_lint
 REPO_ROOT = Path(__file__).resolve().parents[2]
 README_MD = REPO_ROOT / "README.md"
 EXAMPLES_DIR = REPO_ROOT / "examples"
-SKILL_SCRIPTS_DIR = REPO_ROOT / "skills" / "notebooklm" / "scripts"
+SKILL_SCRIPTS_DIR = REPO_ROOT / "plugin" / "skills" / "notebooklm" / "scripts"
 # Prose docs that carry copy-paste quickstarts and were corrected to the
 # canonical idiom — guarded so they can't regress. (``docs/python-api.md``
 # deliberately keeps the deprecated form as a *labeled* example, and
