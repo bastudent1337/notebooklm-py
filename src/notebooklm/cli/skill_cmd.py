@@ -9,6 +9,7 @@ namespace (so ``patch.object(skill_cmd, ...)`` test seams and the
 the Click I/O, the atomic file write, and the packaged-source loader.
 """
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import click
 
 from .._app.skill import (
     SCOPES,
+    SKILL_ENTRY,
     TARGET_CREATE,
     TARGET_OVERWRITE,
     TARGET_UP_TO_DATE,
@@ -31,14 +33,16 @@ from .._app.skill import (
     iter_targets,
     remove_empty_parents,
     report_mixed_no_clobber_up_to_date,
+    stamp_skill_files,
 )
 from ..io import replace_file_atomically
-from .agent_templates import get_agent_source_content
+from .agent_templates import get_agent_source_content, get_skill_source_files
 from .error_handler import exit_with_code
 from .rendering import console, json_output_response
 
 __all__ = [
     "SCOPES",
+    "SKILL_ENTRY",
     "TARGET_CREATE",
     "TARGET_OVERWRITE",
     "TARGET_UP_TO_DATE",
@@ -52,17 +56,38 @@ __all__ = [
     "get_scope_root",
     "get_skill_path",
     "get_skill_source_content",
+    "get_skill_source_tree",
     "get_skill_version",
     "iter_targets",
     "remove_empty_parents",
     "report_mixed_no_clobber_up_to_date",
     "skill",
+    "stamp_skill_files",
 ]
 
 
 def get_skill_source_content() -> str | None:
-    """Read the skill source file from package data."""
+    """Read the skill source file (``SKILL.md`` only) from package data.
+
+    Used by ``skill show`` to display just the entry file. ``skill install``
+    uses :func:`get_skill_source_tree` instead, which reads the whole
+    directory (``SKILL.md`` + ``references/`` + ``scripts/``).
+    """
     return get_agent_source_content("claude")
+
+
+def get_skill_source_tree() -> dict[str, str] | None:
+    """Read the full skill source tree from package data.
+
+    Returns ``{relative_posix_path: content}`` for every file under the
+    packaged skill directory (``SKILL.md``, ``references/*.md``,
+    ``scripts/*``), or ``None`` if the packaged skill data is missing. This is
+    the seam ``skill install`` patches in tests (mirrors
+    :func:`get_skill_source_content`, which stays CLI-owned for the same
+    reason: it forwards to the ``agent_templates`` package-data reader that
+    tests patch on this command module).
+    """
+    return get_skill_source_files()
 
 
 def atomic_write_text(path: Path, content: str) -> None:
@@ -162,21 +187,21 @@ def install(scope: str, target_name: str, dry_run: bool, no_clobber: bool, force
         console.print("[red]Error:[/red] --force and --no-clobber are mutually exclusive.")
         exit_with_code(1)
 
-    # Read skill content from package data
-    content = get_skill_source_content()
-    if content is None:
+    # Read the skill file tree (SKILL.md + references/ + scripts/) from package data
+    files = get_skill_source_tree()
+    if files is None:
         console.print("[red]Error:[/red] Skill source not found in package data.")
         console.print("This may indicate an incomplete or corrupted installation.")
         console.print("Try reinstalling: pip install --force-reinstall notebooklm-py")
         exit_with_code(1)
 
     version = get_package_version()
-    stamped_content = add_version_comment(content, version)
+    stamped_files = stamp_skill_files(files, version)
 
     # Per-target classification drives every downstream decision.
     targets = iter_targets(target_name)
     classifications: list[tuple[str, str, Path]] = [
-        (target, *classify_target(target, scope, stamped_content)) for target in targets
+        (target, *classify_target(target, scope, stamped_files)) for target in targets
     ]
     differing = [
         (target, path) for target, status, path in classifications if status == TARGET_OVERWRITE
@@ -227,8 +252,17 @@ def install(scope: str, target_name: str, dry_run: bool, no_clobber: bool, force
             continue
         # Reaches here for TARGET_CREATE (any mode) or TARGET_OVERWRITE with
         # --force (project) or implicit overwrite (user scope, legacy path).
+        # Replace the whole directory tree: drop it first (clears any stale
+        # leftover file from a prior skill version, or a single-file install
+        # from before the directory refactor) then atomically write every
+        # packaged file back, chmod'ing scripts/ entries executable.
         try:
-            atomic_write_text(path, stamped_content)
+            shutil.rmtree(path, ignore_errors=True)
+            for rel_path, rel_content in stamped_files.items():
+                file_path = path / rel_path
+                atomic_write_text(file_path, rel_content)
+                if rel_path.startswith("scripts/"):
+                    file_path.chmod(0o755)
             installed_paths.append((target, path))
         except OSError as e:
             failed_targets.append((target, e))
@@ -293,13 +327,20 @@ def status(scope: str, target_name: str, json_output: bool):
     for target in selected_targets:
         skill_path = get_skill_path(target, scope)
         skill_version = get_skill_version(skill_path)
-        installed = skill_path.exists()
+        # A target counts as "installed" once its entry file (SKILL.md) is
+        # present -- references/ or scripts/ alone (a partial/failed write)
+        # do not.
+        installed = (skill_path / SKILL_ENTRY).exists()
+        file_count = (
+            sum(1 for p in skill_path.rglob("*") if p.is_file()) if skill_path.is_dir() else 0
+        )
         target_rows.append(
             {
                 "target": target,
                 "label": TARGETS[target].label,
                 "installed": installed,
                 "path": str(skill_path),
+                "files": file_count,
                 "skill_version": skill_version if installed else None,
                 "version_mismatch": bool(
                     installed and skill_version and skill_version != cli_version
@@ -323,6 +364,7 @@ def status(scope: str, target_name: str, json_output: bool):
         console.print(f"    Path: {row['path']}")
         if row["installed"]:
             console.print(f"    Skill version: {row['skill_version'] or 'unknown'}")
+            console.print(f"    Files: {row['files']}")
             if row["version_mismatch"]:
                 console.print(
                     "    [yellow]Version mismatch[/yellow] - run [cyan]notebooklm skill install[/cyan]"
@@ -357,7 +399,7 @@ def uninstall(scope: str, target_name: str):
         skill_path = get_skill_path(target, scope)
         if not skill_path.exists():
             continue
-        skill_path.unlink()
+        shutil.rmtree(skill_path)
         remove_empty_parents(skill_path, scope)
         removed_targets.append(target)
 
