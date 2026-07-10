@@ -9,15 +9,22 @@ makes for each target before deciding what to write. Every transport adapter
 core and renders the classification + outcome into its own surface, prompts,
 and exit-code policy.
 
+Each install target is a **directory** (``SKILL.md`` + ``references/`` +
+``scripts/``), not a single file — :data:`SKILL_ENTRY` names the entry file
+inside that directory that carries the version stamp and is read for
+``show`` / status-version purposes.
+
 What stays in the CLI adapter (``cli/skill_cmd.py``):
 
-* the actual atomic file write (``atomic_write_text``) — it reads the
-  ``replace_file_atomically`` helper off the command module at call time so the
-  historical ``monkeypatch.setattr(skill_cmd, "replace_file_atomically", ...)``
-  test seam keeps landing, and
-* the packaged-source loader (``get_skill_source_content``) — it forwards to
-  the CLI-owned ``agent_templates`` package-data reader, which tests patch on
-  the command module.
+* the actual atomic file writes (``atomic_write_text``) and directory
+  replacement (``shutil.rmtree``) — it reads the ``replace_file_atomically``
+  helper off the command module at call time so the historical
+  ``monkeypatch.setattr(skill_cmd, "replace_file_atomically", ...)`` test seam
+  keeps landing, and
+* the packaged-source loaders (``get_skill_source_content`` /
+  ``get_skill_source_tree``) — they forward to the CLI-owned
+  ``agent_templates`` package-data readers, which tests patch on the command
+  module.
 
 This module is transport-neutral — no ``click`` / ``rich`` / ``cli`` /
 ``fastmcp`` imports (enforced by ``tests/_guardrails/test_app_boundary.py``).
@@ -30,6 +37,11 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+#: Name of the entry file inside each installed skill directory. This is the
+#: file that carries the ``<!-- notebooklm-py vX.Y.Z -->`` version stamp and
+#: is what ``get_skill_version`` / ``get_installed_content`` read.
+SKILL_ENTRY = "SKILL.md"
+
 
 @dataclass(frozen=True)
 class SkillTarget:
@@ -40,8 +52,8 @@ class SkillTarget:
 
 
 TARGETS: dict[str, SkillTarget] = {
-    "claude": SkillTarget("Claude Code", Path(".claude") / "skills" / "notebooklm" / "SKILL.md"),
-    "agents": SkillTarget("Agent Skills", Path(".agents") / "skills" / "notebooklm" / "SKILL.md"),
+    "claude": SkillTarget("Claude Code", Path(".claude") / "skills" / "notebooklm"),
+    "agents": SkillTarget("Agent Skills", Path(".agents") / "skills" / "notebooklm"),
 }
 SCOPES = ("user", "project")
 
@@ -62,12 +74,17 @@ def get_package_version() -> str:
         return "unknown"
 
 
-def get_skill_version(skill_path: Path) -> str | None:
-    """Extract version from skill file header comment."""
-    if not skill_path.exists():
+def get_skill_version(skill_dir: Path) -> str | None:
+    """Extract the version from an installed skill directory's entry file.
+
+    ``skill_dir`` is the target's install *directory*; the version comment
+    lives in ``skill_dir / SKILL_ENTRY`` (see :func:`add_version_comment`).
+    """
+    entry_path = skill_dir / SKILL_ENTRY
+    if not entry_path.exists():
         return None
 
-    with open(skill_path, encoding="utf-8") as f:
+    with open(entry_path, encoding="utf-8") as f:
         content = f.read(500)  # Read first 500 chars
 
     match = re.search(r"notebooklm-py v([\d.]+)", content)
@@ -80,7 +97,7 @@ def get_scope_root(scope: str) -> Path:
 
 
 def get_skill_path(target: str, scope: str) -> Path:
-    """Resolve the installed skill path for a target and scope."""
+    """Resolve the installed skill *directory* for a target and scope."""
     return get_scope_root(scope) / TARGETS[target].relative_path
 
 
@@ -101,6 +118,22 @@ def add_version_comment(content: str, version: str) -> str:
     return version_comment + content
 
 
+def stamp_skill_files(files: dict[str, str], version: str) -> dict[str, str]:
+    """Stamp a packaged skill file tree with the CLI version.
+
+    ``files`` maps POSIX-relative path (e.g. ``"SKILL.md"``,
+    ``"references/setup.md"``, ``"scripts/nlm"``) to file content, as returned
+    by the CLI's ``get_skill_source_tree``. Only :data:`SKILL_ENTRY` carries
+    the ``<!-- notebooklm-py vX.Y.Z -->`` version comment (via
+    :func:`add_version_comment`) -- every other file passes through unchanged,
+    since references/scripts have no header comment convention to stamp.
+    """
+    return {
+        rel_path: (add_version_comment(content, version) if rel_path == SKILL_ENTRY else content)
+        for rel_path, content in files.items()
+    }
+
+
 def remove_empty_parents(skill_path: Path, scope: str) -> None:
     """Remove empty skill directories without touching the scope root."""
     stop_at = get_scope_root(scope)
@@ -114,30 +147,53 @@ def remove_empty_parents(skill_path: Path, scope: str) -> None:
 
 
 def get_installed_content(target: str, scope: str) -> str | None:
-    """Read an installed skill file."""
-    skill_path = get_skill_path(target, scope)
-    if not skill_path.exists():
+    """Read an installed skill's entry file (:data:`SKILL_ENTRY`)."""
+    entry_path = get_skill_path(target, scope) / SKILL_ENTRY
+    if not entry_path.exists():
         return None
-    return skill_path.read_text(encoding="utf-8")
+    return entry_path.read_text(encoding="utf-8")
 
 
-def classify_target(target: str, scope: str, stamped_content: str) -> tuple[str, Path]:
+def classify_target(target: str, scope: str, stamped_files: dict[str, str]) -> tuple[str, Path]:
     """Classify what an install would do for a single target.
 
-    Returns ``(status, skill_path)`` where ``status`` is one of
-    :data:`TARGET_CREATE`, :data:`TARGET_UP_TO_DATE`, or :data:`TARGET_OVERWRITE`.
+    ``stamped_files`` maps POSIX-relative path to the stamped content that
+    would be written for each file in the packaged skill tree (see
+    :func:`stamp_skill_files`). Returns ``(status, skill_path)`` where
+    ``skill_path`` is the target's install *directory* and ``status`` is one
+    of :data:`TARGET_CREATE`, :data:`TARGET_UP_TO_DATE`, or
+    :data:`TARGET_OVERWRITE`.
+
+    ``TARGET_UP_TO_DATE`` requires every file in ``stamped_files`` to already
+    exist under ``skill_path`` with byte-identical content AND no extra files
+    to be present there -- a stale leftover (e.g. from a prior skill version,
+    or an old single-file install occupying the same directory) forces
+    ``TARGET_OVERWRITE`` so ``install`` can replace the whole tree.
     """
     skill_path = get_skill_path(target, scope)
     if not skill_path.exists():
         return TARGET_CREATE, skill_path
-    try:
-        existing = skill_path.read_text(encoding="utf-8")
-    except OSError:
-        # Unreadable existing file -- treat as differing so we surface intent.
+    if not skill_path.is_dir():
+        # Occupied by a non-directory (e.g. a stray file blocking the install
+        # path) -- nothing to compare file-by-file, so surface as differing.
         return TARGET_OVERWRITE, skill_path
-    if existing == stamped_content:
-        return TARGET_UP_TO_DATE, skill_path
-    return TARGET_OVERWRITE, skill_path
+
+    try:
+        installed_files = {
+            path.relative_to(skill_path).as_posix()
+            for path in skill_path.rglob("*")
+            if path.is_file()
+        }
+        if installed_files != set(stamped_files):
+            return TARGET_OVERWRITE, skill_path
+        for rel_path, content in stamped_files.items():
+            if (skill_path / rel_path).read_text(encoding="utf-8") != content:
+                return TARGET_OVERWRITE, skill_path
+    except OSError:
+        # Unreadable existing tree -- treat as differing so we surface intent.
+        return TARGET_OVERWRITE, skill_path
+
+    return TARGET_UP_TO_DATE, skill_path
 
 
 def report_mixed_no_clobber_up_to_date(
@@ -155,6 +211,7 @@ def report_mixed_no_clobber_up_to_date(
 
 __all__ = [
     "SCOPES",
+    "SKILL_ENTRY",
     "TARGET_CREATE",
     "TARGET_OVERWRITE",
     "TARGET_UP_TO_DATE",
@@ -170,4 +227,5 @@ __all__ = [
     "iter_targets",
     "remove_empty_parents",
     "report_mixed_no_clobber_up_to_date",
+    "stamp_skill_files",
 ]

@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manifest at all, so the command failed silently. The plugin registers the
   same `uvx`-launched MCP server as `notebooklm mcp install claude-code` and
   the `.mcpb` desktop bundle. See [docs/mcp-guide.md](docs/mcp-guide.md#connect-a-client).
+- **NotebookLM skill refactored into a directory.** `skills/notebooklm/`
+  replaces the single-file root `SKILL.md`: a concise `SKILL.md` (≤300 lines)
+  plus `references/` (setup, command reference, workflows, troubleshooting —
+  loaded on demand, not preloaded) and `scripts/` (a self-bootstrapping `nlm`
+  CLI launcher plus `research_to_podcast.py` / `bulk_import.py` /
+  `generate_artifact.py` PEP 723 workflow scripts). `notebooklm skill install`
+  now installs the whole directory (scripts chmod `0755`) instead of a single
+  file, and the `.claude-plugin/` plugin ships the skill alongside the MCP
+  server (`skills` field in `plugin.json`, surfaced in Claude Code as
+  `/notebooklm-mcp:notebooklm`). The root `SKILL.md` is removed. By design, a
+  **project-scope** reinstall (`--scope project`) over an old single-file
+  install now requires `--force` (the old install is missing the new
+  `references/`/`scripts/` files, so it classifies as a differing overwrite).
 
 ### Fixed
 
