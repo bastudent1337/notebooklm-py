@@ -73,16 +73,19 @@ download `notebooklm-mcp.mcpb` from the
 
 **Claude Code users** can instead add this repo as a plugin marketplace, which
 registers the same `uvx`-launched server via `.claude-plugin/plugin.json`
-(source of truth: [`../.claude-plugin/`](../.claude-plugin/)):
+(source of truth: [`../.claude-plugin/`](../.claude-plugin/)) **and** bundles
+the `notebooklm` Agent Skill (source: [`../skills/notebooklm/`](../skills/notebooklm/)),
+surfaced in Claude Code as `/notebooklm-mcp:notebooklm`:
 
 ```text
 /plugin marketplace add teng-lin/notebooklm-py
 /plugin install notebooklm-mcp
 ```
 
-This is equivalent to `notebooklm mcp install claude-code`, but managed
-through Claude Code's plugin UI (enable/disable, updates) instead of a direct
-`~/.claude.json` edit.
+This is equivalent to `notebooklm mcp install claude-code` plus
+`notebooklm skill install --target claude`, but managed through Claude Code's
+plugin UI (enable/disable, updates) instead of direct `~/.claude.json` edits
+and a manual skill install.
 
 ## Run it directly
 
