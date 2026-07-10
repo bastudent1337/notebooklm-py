@@ -71,6 +71,19 @@ download `notebooklm-mcp.mcpb` from the
 (**Assets**) and use "Install Extension"; see
 [`desktop-extension/README.md`](../desktop-extension/README.md) for details.
 
+**Claude Code users** can instead add this repo as a plugin marketplace, which
+registers the same `uvx`-launched server via `.claude-plugin/plugin.json`
+(source of truth: [`../.claude-plugin/`](../.claude-plugin/)):
+
+```text
+/plugin marketplace add teng-lin/notebooklm-py
+/plugin install notebooklm-mcp
+```
+
+This is equivalent to `notebooklm mcp install claude-code`, but managed
+through Claude Code's plugin UI (enable/disable, updates) instead of a direct
+`~/.claude.json` edit.
+
 ## Run it directly
 
 The console script is `notebooklm-mcp`:

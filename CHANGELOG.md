@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Code plugin support.** Added `.claude-plugin/marketplace.json` and
+  `.claude-plugin/plugin.json` so `/plugin marketplace add
+  teng-lin/notebooklm-py` now works — previously the repo had no plugin
+  manifest at all, so the command failed silently. The plugin registers the
+  same `uvx`-launched MCP server as `notebooklm mcp install claude-code` and
+  the `.mcpb` desktop bundle. See [docs/mcp-guide.md](docs/mcp-guide.md#connect-a-client).
+
 ### Fixed
 
 - **Drive-hosted PDFs no longer list as `google_spreadsheet`.** The backend
