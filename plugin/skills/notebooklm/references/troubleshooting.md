@@ -23,6 +23,32 @@ condensed exit-code table used day-to-day.
 | Invalid notebook/source ID | Wrong ID | Run `notebooklm list` to verify |
 | RPC protocol error | Google changed APIs | May need CLI update |
 
+## Login Flow Quirks
+
+Two `notebooklm login` failure modes look alarming but have quick, known fixes.
+
+**"The browser window was closed during login" on the first attempt(s), even with a real display available.**
+This is the same message a genuinely headless/no-display environment produces when Playwright can't render
+a window at all, so the text alone doesn't tell you which case you're in. Disambiguate by elapsed time and
+profile activity: a true no-display failure returns almost instantly, while a window that opened and was
+then closed (by the person signing in, or by clicking away before it auto-closed) typically shows 1-3
+minutes of "Waiting for login" first, and leaves real activity in `<profile>/browser_profile/Default`
+(check the `Last Version` / `Local State` file mtimes — if they moved, a browser really did run). If still
+ambiguous, just ask whoever is signing in whether a Chromium window actually appeared on their screen.
+**Fix:** re-run `notebooklm login` (no flags needed — `--fresh` is only for actually-corrupted profiles) and
+stay with the window until it closes itself; closing it early is the single most common cause of this error.
+
+**First successful login (`Login detected.`) still fails `auth check` / `auth refresh` with
+`Missing required cookies: __Secure-1PSIDTS`.** Google does not always mint the `__Secure-1PSIDTS`
+security-token cookie on the very first sign-in into a fresh or freshly-cleared browser profile — every
+other cookie (`SID`, `__Secure-1PSID`, etc.) is captured correctly, but this one token is sometimes only
+issued on a subsequent authenticated visit. `auth refresh` cannot repair this itself, since its server-side
+refresh needs that cookie to already be present. **Fix:** simply run `notebooklm login` again. The
+persistent browser profile now already holds a valid Google session, so the second run is fast (often
+resolves in under a minute) and reliably picks up the missing cookie. Confirm with
+`notebooklm auth check --test --json` — require `"status": "ok"` and `"checks": {"token_fetch": true}`
+with no `error` under `details`.
+
 ## Exit Codes
 
 All commands use consistent exit codes:
